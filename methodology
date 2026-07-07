@@ -1,0 +1,31 @@
+## 1. Preprocessing
+- Convert the input RGB image to grayscale (`im2gray`) to reduce data to a single intensity channel.
+- Apply a 3×3 median filter (`medfilt2`) to remove salt-and-pepper noise while preserving plate edges.
+- Apply Contrast-Limited Adaptive Histogram Equalization (`adapthisteq`) so the plate remains visible under uneven or poor lighting.
+
+## 2. Edge Detection
+- Use the Sobel operator (`edge(..., 'sobel')`) to highlight strong intensity gradients — number plates have closely spaced characters that produce a dense cluster of edges.
+
+## 3. Morphological Processing
+- Dilate the edge image with a rectangular structuring element (`strel('rectangle', [5 15])`) to merge nearby character edges into one connected plate-shaped blob.
+- Fill enclosed holes (`imfill`) and remove small stray blobs under 500 px (`bwareaopen`) to clean up the candidate mask.
+
+## 4. Candidate Region Extraction
+- Run `regionprops` on the cleaned binary mask to obtain the bounding box, area, and extent of every connected blob in the image.
+
+## 5. Plate Region Filtering
+- Standard number plates are wide rectangles. Candidates are filtered using:
+  - **Aspect ratio** between 2:1 and 6:1 (width / height)
+  - **Minimum area** threshold to reject small noise blobs
+  - A **score** of `Area × Extent` is used to rank remaining candidates, favoring solid rectangular blobs over sparse/irregular ones.
+- The highest-scoring candidate is selected as the detected plate region.
+
+## 6. Character Segmentation & OCR
+- The plate region is cropped from the grayscale image and binarized using adaptive thresholding tuned for dark text on a light background (`imbinarize(..., 'adaptive', 'ForegroundPolarity', 'dark')`).
+- Small speckle noise is removed with `bwareaopen`.
+- MATLAB's built-in `ocr()` function (Computer Vision Toolbox) reads the characters, restricted to the alphanumeric character set typically used on plates.
+
+## Limitations
+- Heuristic aspect-ratio/area filtering can misfire on cluttered backgrounds with plate-like rectangular objects (e.g., bumper stickers, grilles).
+- OCR accuracy depends on image resolution and plate skew; heavily angled plates may need perspective correction first.
+- Designed for single, clearly visible plates per image rather than multi-vehicle scenes.
